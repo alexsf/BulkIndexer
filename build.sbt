@@ -1,4 +1,4 @@
-name := "Bulk Indexer"
+name := "bulk-indexer"
 
 version := "1.0"
 
