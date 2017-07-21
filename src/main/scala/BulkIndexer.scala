@@ -15,7 +15,8 @@ object BulkIndexer {
         val res = req.postData(payload)
                 .header("Content-Type", "application/x-ndjson")
                 .header("Charset", "UTF-8")
-                .option(HttpOptions.readTimeout(600000)).asString
+                .option(HttpOptions.readTimeout(6000000))
+                .option(HttpOptions.connTimeout(6000000)).asString
 
         res
     }
@@ -45,7 +46,7 @@ object BulkIndexer {
         var nBatches     = argmap("--number-of-batches")
 
         // load file and partition RDD
-        var rdd1 = sc.textFile(textFileName)
+        var rdd1 = sc.textFile(textFileName, nBatches.toInt)
        
         // RDD[DOC_ID, DOC_STRING] 
         var rdd2 = rdd1.map(d=>({
@@ -61,12 +62,12 @@ object BulkIndexer {
             (k, s"""{"index": {"_index": "$indexName", "_type": "$indexType", "_id": "$k"}}\n""" + kv._2)
         })
 
-        // break bulk indexing in 10 batches
-        var rdd4 = rdd3.map(kv=>(((kv._1.toLong) % (nBatches.toInt)),kv._2))
+        // break bulk indexing in nBatches
+        var rdd4 = rdd3.mapPartitionsWithIndex { (partid, iterator) => List((partid, iterator.toList.map(t=>t._2).mkString("\n"))).iterator }
 
 
         // RDD[BATCH_ID, CONCATENATED_DOC_STRINGS]
-        var rdd5 = rdd4.reduceByKey(_ + "\n" + _)
+        var rdd5 = rdd4 //rdd4.reduceByKey(_ + "\n" + _)
 
 
         // POST EACH BATCH TO _BULK
